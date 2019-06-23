@@ -1,5 +1,5 @@
 const { parentPort, workerData } = require("worker_threads");
-const { CodeRunner } = require("isolated-runtime-core");
+const { StringCodeRunner, CodeRunner } = require("isolated-runtime-core");
 const requireWithFallback = require("./requireWithFallback");
 
 const { sourceExtensions } = workerData;
@@ -23,15 +23,18 @@ parentPort.on(
     root,
     file,
     funcName,
+    code,
     args,
     context,
     external,
     whitelistedPaths,
     resolverOptions = {}
   }) => {
-    const runner = new CodeRunner({
+    const ChosenCodeRunner = code ? StringCodeRunner : CodeRunner;
+    const runner = new ChosenCodeRunner({
       root,
       file,
+      code,
       sourceExtensions,
       compiler,
       external,
@@ -41,6 +44,7 @@ parentPort.on(
 
     try {
       const { argumentList, resolveArguments } = buildArgs(args);
+
       const result = await runner.run({
         funcName,
         args: argumentList,

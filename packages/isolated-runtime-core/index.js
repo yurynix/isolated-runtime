@@ -1,5 +1,5 @@
 const path = require("path");
-const { NodeVM } = require("vm2");
+const { NodeVM, VM } = require("vm2");
 const { adaptError } = require("./lib/error-adapter");
 const errors = require("./lib/errors");
 const handleConsole = require("./lib/handleConsole");
@@ -83,7 +83,54 @@ class CodeRunner {
   }
 }
 
+class StringCodeRunner {
+  constructor({ code, onConsole, compiler }) {
+    this._onConsole = onConsole;
+    this._compiler = compiler;
+    this._code = code;
+  }
+
+  async run({
+    args,
+    context = {},
+    running = () => {},
+    resolveArguments = i => i
+  }) {
+    return new Promise((resolve, reject) => {
+      const vm = new VM({
+        sandbox: {
+          __globals__: {
+            code: this._code,
+            args: resolveArguments(args),
+            resolve,
+            reject,
+            running,
+            __context__: context
+          }
+        }
+      });
+
+      vm.run(
+        `(async function() {
+          try {
+            const f = ${this._code};
+            if (typeof f !== 'function') {
+              throw new TypeError('Supplied code is not a function');
+            }
+            __globals__.running()
+            const result = await f(...__globals__.args);
+            __globals__.resolve(result)
+          } catch(e) {
+            __globals__.reject(e)
+          }
+        })()`
+      );
+    });
+  }
+}
+
 module.exports = {
   CodeRunner,
+  StringCodeRunner,
   errors
 };
